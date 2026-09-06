@@ -68,6 +68,125 @@ nav a:hover {
   color: #d35c3c;
 }
 
+.public-page {
+  min-height: 100vh;
+  background: #fffaf4;
+}
+
+.public-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 22px clamp(20px, 7vw, 92px);
+  border-bottom: 1px solid #eadfd2;
+}
+
+.public-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #203b36;
+  font-size: 1.15rem;
+  font-weight: bold;
+  text-decoration: none;
+}
+
+.public-login-button,
+.public-action {
+  padding: 11px 18px;
+  color: #fff;
+  background: #203b36;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  font-size: 0.85rem;
+  font-weight: bold;
+}
+
+.public-login-button:hover,
+.public-action:hover {
+  background: #d35c3c;
+}
+
+.public-hero {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  align-items: center;
+  min-height: 470px;
+  padding: 54px clamp(20px, 7vw, 92px);
+  background: #f3dfc8;
+}
+
+.public-copy h1 {
+  max-width: 520px;
+  margin: 0 0 20px;
+  color: #203b36;
+  font-size: clamp(2.8rem, 6vw, 5.5rem);
+  font-weight: normal;
+  line-height: 0.96;
+}
+
+.public-copy > p:not(.section-label) {
+  max-width: 430px;
+  margin-bottom: 28px;
+  color: #63736f;
+  font-family: Arial, sans-serif;
+  line-height: 1.6;
+}
+
+.public-hero img {
+  width: 100%;
+  max-height: 350px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 16px 30px rgba(32, 59, 54, 0.18);
+}
+
+.public-menu {
+  width: min(100% - 40px, 980px);
+  margin: 0 auto;
+  padding: 64px 0;
+}
+
+.public-product-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+.public-product-card {
+  padding: 24px;
+  background: #edf3f0;
+  border-radius: 6px;
+  text-align: center;
+}
+
+.public-product-card span {
+  font-size: 3rem;
+}
+
+.public-product-card h3 {
+  margin: 12px 0 6px;
+  color: #203b36;
+}
+
+.public-product-card p {
+  margin: 0;
+  color: #63736f;
+  font-family: Arial, sans-serif;
+  font-size: 0.85rem;
+}
+
+.public-footer {
+  padding: 24px clamp(20px, 7vw, 92px);
+  color: #63736f;
+  border-top: 1px solid #d8e2de;
+  font-family: Arial, sans-serif;
+  font-size: 0.8rem;
+  text-align: center;
+}
+
 .login-page {
   display: grid;
   min-height: 100vh;
@@ -170,6 +289,18 @@ nav a:hover {
 .login-help {
   margin: 22px 0 0;
   font-size: 0.75rem;
+}
+
+.back-public-button {
+  margin-top: 20px;
+  padding: 0;
+  color: #63736f;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  font-family: Arial, sans-serif;
+  font-size: 0.75rem;
+  text-decoration: underline;
 }
 
 .dashboard-preview {
@@ -282,6 +413,19 @@ nav a:hover {
 }
 
 @media (max-width: 720px) {
+  .public-hero {
+    grid-template-columns: 1fr;
+    gap: 36px;
+  }
+
+  .public-menu {
+    width: min(100% - 28px, 980px);
+  }
+
+  .public-product-grid {
+    grid-template-columns: 1fr;
+  }
+
   .app-shell {
     width: min(100% - 28px, 980px);
   }
