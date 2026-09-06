@@ -1,102 +1,54 @@
-import { useEffect, useState } from 'react'
-import './App.css'
-
-const API_URL = 'https://localhost:7244'
+import comidaImage from './assets/comida.avif'
+import './styles/App.css'
 
 function App() {
-  const [productos, setProductos] = useState([])
-  const [cargando, setCargando] = useState(true)
-  const [error, setError] = useState('')
-
-  useEffect(() => {
-    const cargarProductos = async () => {
-      try {
-        const response = await fetch(`${API_URL}/api/productos`)
-        if (!response.ok) throw new Error('No se pudieron cargar los productos')
-        setProductos(await response.json())
-      } catch (requestError) {
-        setError(requestError.message)
-      } finally {
-        setCargando(false)
-      }
-    }
-
-    cargarProductos()
-  }, [])
-
   return (
-    <div className="site-shell">
-      <header className="site-header">
-        <a className="brand" href="#inicio" aria-label="Lucy Fast Food, inicio">
-          <span className="brand-mark">L</span>
-          <span>Lucy Fast Food</span>
-        </a>
+    <div className="app-shell">
+      <header className="app-header">
+        <div className="brand-mark">L</div>
+        <h1>Lucy Fast Food</h1>
+        <p>Administración del negocio</p>
         <nav aria-label="Navegación principal">
-          <a href="#menu">Menú</a>
-          <a href="#nosotros">Nosotros</a>
-          <a className="login-link" href="#login">Ingresar</a>
+          <a href="#inicio">Inicio</a>
+          <a href="#productos">Productos</a>
+          <a href="#ventas">Ventas</a>
+          <a href="#login">Cerrar sesión</a>
         </nav>
       </header>
 
-      <main>
-        <section className="hero-section" id="inicio">
-          <div className="hero-copy">
-            <p className="eyebrow">Sabor hecho al momento</p>
-            <h1>Comida rápida con sabor de casa.</h1>
-            <p className="hero-text">Hamburguesas, papas y bebidas preparadas para disfrutar sin complicaciones.</p>
-            <a className="primary-button" href="#menu">Ver el menú</a>
-          </div>
-          <div className="hero-plate" aria-label="Hamburguesa con papas" role="img">
-            <span className="plate-shadow" />
-            <span className="burger">🍔</span>
-            <span className="fries">🍟</span>
+      <main id="inicio">
+        <section className="dashboard-preview" aria-label="Vista previa del dashboard">
+          <img src={comidaImage} alt="Comida de Lucy Fast Food" />
+          <div>
+            <p className="section-label">Lucy Fast Food</p>
+            <h2>Sabor increíble a la velocidad de tu antojo.</h2>
+            <p>Rápido, fresco y deliciosamente tuyo.</p>
           </div>
         </section>
-
-        <section className="menu-section" id="menu">
+        <section className="summary-section" aria-labelledby="summary-title">
           <div className="section-heading">
             <div>
-              <p className="eyebrow">Nuestro menú</p>
-              <h2>Lo que tenemos para ti</h2>
+              <p className="section-label">Panel principal</p>
+              <h2 id="summary-title">Resumen de ventas</h2>
             </div>
-            <span className="menu-count">{productos.length} opciones</span>
+            <span>Hoy, 6 de septiembre</span>
           </div>
-
-          {cargando && <p className="status-message">Cargando productos...</p>}
-          {error && <p className="status-message error-message">{error}. Verifica que el backend esté encendido.</p>}
-          {!cargando && !error && productos.length === 0 && <p className="status-message">Todavía no hay productos registrados.</p>}
-          {!cargando && !error && productos.length > 0 && (
-            <div className="product-grid">
-              {productos.map((producto) => (
-                <article className="product-card" key={producto.id}>
-                  <div className="product-image">
-                    {producto.imagen ? <img src={producto.imagen} alt={producto.nombre} /> : <span aria-hidden="true">🍔</span>}
-                  </div>
-                  <div className="product-info">
-                    <div className="product-title-row">
-                      <h3>{producto.nombre}</h3>
-                      <strong>Bs. {Number(producto.precio).toFixed(2)}</strong>
-                    </div>
-                    <p>{producto.descripcion}</p>
-                    <span className="category-tag">{producto.categoria}</span>
-                  </div>
-                </article>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <section className="about-section" id="nosotros">
-          <p className="eyebrow">Hecho para compartir</p>
-          <h2>Una parada sencilla para comer bien.</h2>
-          <p>En Lucy Fast Food preparamos cada pedido con ingredientes frescos y atención cercana.</p>
+          <div className="summary-grid">
+            <article className="summary-card">
+              <span>Ventas del día</span>
+              <strong>Bs. 0,00</strong>
+            </article>
+            <article className="summary-card">
+              <span>Productos registrados</span>
+              <strong>0</strong>
+            </article>
+            <article className="summary-card">
+              <span>Pedidos registrados</span>
+              <strong>0</strong>
+            </article>
+          </div>
         </section>
       </main>
-
-      <footer id="login">
-        <span>Lucy Fast Food</span>
-        <a href="mailto:contacto@lucyfastfood.com">Contacto</a>
-      </footer>
     </div>
   )
 }

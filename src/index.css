@@ -1,7 +1,7 @@
 :root {
   font-family: Georgia, 'Times New Roman', serif;
-  color: #2d2924;
-  background: #f6f0e8;
+  color: #203b36;
+  background: #edf3f0;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
@@ -10,6 +10,10 @@
 body {
   margin: 0;
   min-width: 320px;
+}
+
+* {
+  box-sizing: border-box;
 }
 
 #root {
