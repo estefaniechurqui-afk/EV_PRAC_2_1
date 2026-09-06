@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import comidaImage from './assets/comida.avif'
 import './styles/App.css'
 
@@ -11,6 +11,24 @@ function App() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [cargando, setCargando] = useState(false)
+  const [productos, setProductos] = useState([])
+  const [cargandoProductos, setCargandoProductos] = useState(true)
+
+  useEffect(() => {
+    const cargarProductos = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/productos`)
+        if (!response.ok) throw new Error('No se pudieron cargar los productos')
+        setProductos(await response.json())
+      } catch {
+        setProductos([])
+      } finally {
+        setCargandoProductos(false)
+      }
+    }
+
+    cargarProductos()
+  }, [])
 
   const iniciarSesion = async (event) => {
     event.preventDefault()
@@ -76,11 +94,33 @@ function App() {
             </div>
             <span>Productos disponibles</span>
           </div>
-          <div className="public-product-grid">
-            <article className="public-product-card"><span>🍔</span><h3>Hamburguesas</h3><p>Preparadas al momento.</p></article>
-            <article className="public-product-card"><span>🍟</span><h3>Papas crocantes</h3><p>El acompañamiento perfecto.</p></article>
-            <article className="public-product-card"><span>🥤</span><h3>Bebidas frías</h3><p>Para completar tu pedido.</p></article>
-          </div>
+          {cargandoProductos && <p className="public-status">Cargando productos...</p>}
+          {!cargandoProductos && productos.length === 0 && (
+            <p className="public-status">Todavía no hay productos disponibles.</p>
+          )}
+          {!cargandoProductos && productos.length > 0 && (
+            <div className="public-product-grid">
+              {productos.map((producto) => (
+                <article className="public-product-card" key={producto.id}>
+                  <div className="public-product-image">
+                    {producto.imagen ? (
+                      <img src={producto.imagen} alt={producto.nombre} />
+                    ) : (
+                      <span aria-hidden="true">🍔</span>
+                    )}
+                  </div>
+                  <div className="public-product-content">
+                    <div className="public-product-title">
+                      <h3>{producto.nombre}</h3>
+                      <strong>Bs. {Number(producto.precio).toFixed(2)}</strong>
+                    </div>
+                    <p>{producto.descripcion}</p>
+                    <span className="public-category">{producto.categoria}</span>
+                  </div>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         <footer className="public-footer">Lucy Fast Food · Sabor hecho al momento</footer>
