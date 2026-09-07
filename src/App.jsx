@@ -3,6 +3,9 @@ import comidaImage from './assets/comida.avif'
 import './styles/App.css'
 
 const API_URL = 'https://localhost:7244'
+const formatoMoneda = (valor) => `Bs. ${Number(valor).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
+const productoVacio = { nombre: '', descripcion: '', precio: '', categoria: '', imagen: '', disponible: true }
+const ventaVacia = { productoId: '', cantidad: 1 }
 
 function App() {
   const [sesionIniciada, setSesionIniciada] = useState(Boolean(localStorage.getItem('token')))
@@ -13,6 +16,17 @@ function App() {
   const [cargando, setCargando] = useState(false)
   const [productos, setProductos] = useState([])
   const [cargandoProductos, setCargandoProductos] = useState(true)
+  const [ventas, setVentas] = useState([])
+  const [cargandoVentas, setCargandoVentas] = useState(false)
+  const [errorVentas, setErrorVentas] = useState('')
+  const [vista, setVista] = useState('inicio')
+  const [menuAbierto, setMenuAbierto] = useState('')
+  const [productoSeleccionado, setProductoSeleccionado] = useState(null)
+  const [productoForm, setProductoForm] = useState(productoVacio)
+  const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
+  const [ventaForm, setVentaForm] = useState(ventaVacia)
+  const [mensajeAdmin, setMensajeAdmin] = useState('')
+  const [errorAdmin, setErrorAdmin] = useState('')
 
   useEffect(() => {
     const cargarProductos = async () => {
@@ -29,6 +43,29 @@ function App() {
 
     cargarProductos()
   }, [])
+
+  useEffect(() => {
+    if (!sesionIniciada) return
+
+    const cargarVentas = async () => {
+      setCargandoVentas(true)
+      setErrorVentas('')
+
+      try {
+        const response = await fetch(`${API_URL}/api/ventas`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+        })
+        if (!response.ok) throw new Error('No se pudo cargar el resumen de ventas')
+        setVentas(await response.json())
+      } catch (salesError) {
+        setErrorVentas(salesError.message)
+      } finally {
+        setCargandoVentas(false)
+      }
+    }
+
+    cargarVentas()
+  }, [sesionIniciada])
 
   const iniciarSesion = async (event) => {
     event.preventDefault()
@@ -62,7 +99,115 @@ function App() {
     setSesionIniciada(false)
     setMostrarLogin(false)
     setUsuario('')
+    setMenuAbierto('')
   }
+
+  const peticionProtegida = async (ruta, opciones = {}) => fetch(`${API_URL}${ruta}`, {
+    ...opciones,
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${localStorage.getItem('token')}`,
+      ...opciones.headers,
+    },
+  })
+
+  const prepararProducto = (producto = productoVacio) => {
+    setProductoSeleccionado(producto.id ? producto : null)
+    setProductoForm({
+      nombre: producto.nombre || '',
+      descripcion: producto.descripcion || '',
+      precio: producto.precio || '',
+      categoria: producto.categoria || '',
+      imagen: producto.imagen || '',
+      disponible: producto.disponible ?? true,
+    })
+    setVista('producto-form')
+    setMensajeAdmin('')
+    setErrorAdmin('')
+  }
+
+  const guardarProducto = async (event) => {
+    event.preventDefault()
+    setErrorAdmin('')
+    setMensajeAdmin('')
+
+    try {
+      const response = await peticionProtegida(
+        productoSeleccionado ? `/api/productos/${productoSeleccionado.id}` : '/api/productos',
+        { method: productoSeleccionado ? 'PUT' : 'POST', body: JSON.stringify({ ...productoForm, precio: Number(productoForm.precio) }) },
+      )
+      if (!response.ok) throw new Error('No se pudo guardar el producto')
+
+      const productoGuardado = productoSeleccionado
+        ? { ...productoSeleccionado, ...productoForm, precio: Number(productoForm.precio) }
+        : await response.json()
+      setProductos((actuales) => productoSeleccionado
+        ? actuales.map((item) => item.id === productoGuardado.id ? productoGuardado : item)
+        : [...actuales, productoGuardado])
+      setVista('productos')
+      setMensajeAdmin('Producto guardado correctamente.')
+    } catch (saveError) {
+      setErrorAdmin(saveError.message)
+    }
+  }
+
+  const eliminarProducto = async (id) => {
+    if (!window.confirm('¿Quieres eliminar este producto?')) return
+    const response = await peticionProtegida(`/api/productos/${id}`, { method: 'DELETE' })
+    if (response.ok) {
+      setProductos((actuales) => actuales.filter((producto) => producto.id !== id))
+      setProductoSeleccionado(null)
+      setMensajeAdmin('Producto eliminado correctamente.')
+    } else {
+      setErrorAdmin('No se puede eliminar este producto porque puede tener ventas relacionadas.')
+    }
+  }
+
+  const prepararVenta = (venta = ventaVacia) => {
+    setVentaSeleccionada(venta.id ? venta : null)
+    setVentaForm({ productoId: venta.productoId || '', cantidad: venta.cantidad || 1 })
+    setVista('venta-form')
+    setMensajeAdmin('')
+    setErrorAdmin('')
+  }
+
+  const guardarVenta = async (event) => {
+    event.preventDefault()
+    setErrorAdmin('')
+    setMensajeAdmin('')
+
+    try {
+      const body = { productoId: Number(ventaForm.productoId), cantidad: Number(ventaForm.cantidad) }
+      const response = await peticionProtegida(
+        ventaSeleccionada ? `/api/ventas/${ventaSeleccionada.id}` : '/api/ventas',
+        { method: ventaSeleccionada ? 'PUT' : 'POST', body: JSON.stringify(body) },
+      )
+      if (!response.ok) throw new Error('No se pudo guardar la venta')
+
+      const ventaNueva = ventaSeleccionada ? { ...ventaSeleccionada, ...body } : await response.json()
+      setVentas((actuales) => ventaSeleccionada
+        ? actuales.map((item) => item.id === ventaNueva.id ? ventaNueva : item)
+        : [ventaNueva, ...actuales])
+      setVista('ventas')
+      setMensajeAdmin('Venta guardada correctamente.')
+    } catch (saveError) {
+      setErrorAdmin(saveError.message)
+    }
+  }
+
+  const eliminarVenta = async (id) => {
+    if (!window.confirm('¿Quieres eliminar esta venta?')) return
+    const response = await peticionProtegida(`/api/ventas/${id}`, { method: 'DELETE' })
+    if (response.ok) {
+      setVentas((actuales) => actuales.filter((venta) => venta.id !== id))
+      setVentaSeleccionada(null)
+      setMensajeAdmin('Venta eliminada correctamente.')
+    } else {
+      setErrorAdmin('No se pudo eliminar la venta.')
+    }
+  }
+
+  const totalVentas = ventas.reduce((total, venta) => total + Number(venta.total), 0)
 
   if (!sesionIniciada && !mostrarLogin) {
     return (
@@ -158,14 +303,50 @@ function App() {
         <h1>Lucy Fast Food</h1>
         <p>Administración del negocio</p>
         <nav aria-label="Navegación principal">
-          <a href="#inicio">Inicio</a>
-          <a href="#productos">Productos</a>
-          <a href="#ventas">Ventas</a>
+          <button className={vista === 'inicio' ? 'nav-active' : ''} type="button" onClick={() => setVista('inicio')}>Inicio</button>
+          <div className="nav-dropdown">
+            <button className={vista.startsWith('producto') ? 'nav-active dropdown-trigger' : 'dropdown-trigger'} type="button" onClick={() => setMenuAbierto(menuAbierto === 'productos' ? '' : 'productos')} aria-expanded={menuAbierto === 'productos'}>Productos <span aria-hidden="true">⌄</span></button>
+            {menuAbierto === 'productos' && <div className="dropdown-menu"><button type="button" onClick={() => { setVista('productos'); setMenuAbierto('') }}>Detalle</button><button type="button" onClick={() => { prepararProducto(); setMenuAbierto('') }}>Agregar</button></div>}
+          </div>
+          <div className="nav-dropdown">
+            <button className={vista.startsWith('venta') ? 'nav-active dropdown-trigger' : 'dropdown-trigger'} type="button" onClick={() => setMenuAbierto(menuAbierto === 'ventas' ? '' : 'ventas')} aria-expanded={menuAbierto === 'ventas'}>Ventas <span aria-hidden="true">⌄</span></button>
+            {menuAbierto === 'ventas' && <div className="dropdown-menu"><button type="button" onClick={() => { setVista('ventas'); setMenuAbierto('') }}>Detalle</button><button type="button" onClick={() => { prepararVenta(); setMenuAbierto('') }}>Registrar</button></div>}
+          </div>
           <button className="logout-button" type="button" onClick={cerrarSesion}>Cerrar sesión</button>
         </nav>
       </header>
 
       <main id="inicio">
+        {(mensajeAdmin || errorAdmin) && <p className={errorAdmin ? 'admin-message error-message' : 'admin-message'}>{errorAdmin || mensajeAdmin}</p>}
+        {vista === 'productos' && (
+          <section className="management-section" aria-labelledby="products-title">
+            <div className="section-heading"><div><p className="section-label">Administración</p><h2 id="products-title">Productos</h2></div><button className="primary-admin-button" type="button" onClick={() => prepararProducto()}>Nuevo producto</button></div>
+            <div className="management-grid">
+              <div className="record-list">
+                {productos.map((producto) => <button className={productoSeleccionado?.id === producto.id ? 'record-item selected' : 'record-item'} type="button" key={producto.id} onClick={() => setProductoSeleccionado(producto)}><span>{producto.nombre}</span><strong>{formatoMoneda(producto.precio)}</strong></button>)}
+              </div>
+              <div className="record-detail">
+                {productoSeleccionado ? <><p className="section-label">Detalle del producto</p><h3>{productoSeleccionado.nombre}</h3><p>{productoSeleccionado.descripcion}</p><p><strong>Categoría:</strong> {productoSeleccionado.categoria}</p><p><strong>Estado:</strong> {productoSeleccionado.disponible ? 'Disponible' : 'No disponible'}</p><div className="detail-actions"><button type="button" onClick={() => prepararProducto(productoSeleccionado)}>Editar</button><button className="danger-button" type="button" onClick={() => eliminarProducto(productoSeleccionado.id)}>Eliminar</button></div></> : <p>Selecciona un producto para ver su detalle.</p>}
+              </div>
+            </div>
+          </section>
+        )}
+        {vista === 'producto-form' && <ProductForm form={productoForm} setForm={setProductoForm} editing={productoSeleccionado} onSubmit={guardarProducto} onCancel={() => setVista('productos')} />}
+        {vista === 'ventas' && (
+          <section className="management-section" aria-labelledby="sales-title">
+            <div className="section-heading"><div><p className="section-label">Administración</p><h2 id="sales-title">Ventas</h2></div><button className="primary-admin-button" type="button" onClick={() => prepararVenta()}>Nueva venta</button></div>
+            <div className="management-grid">
+              <div className="record-list">
+                {ventas.map((venta) => <button className={ventaSeleccionada?.id === venta.id ? 'record-item selected' : 'record-item'} type="button" key={venta.id} onClick={() => setVentaSeleccionada(venta)}><span>{venta.producto}</span><strong>{formatoMoneda(venta.total)}</strong></button>)}
+              </div>
+              <div className="record-detail">
+                {ventaSeleccionada ? <><p className="section-label">Detalle de la venta</p><h3>{ventaSeleccionada.producto}</h3><p><strong>Cantidad:</strong> {ventaSeleccionada.cantidad}</p><p><strong>Total:</strong> {formatoMoneda(ventaSeleccionada.total)}</p><p><strong>Fecha:</strong> {new Date(ventaSeleccionada.fecha).toLocaleString('es-BO')}</p><div className="detail-actions"><button type="button" onClick={() => prepararVenta(ventaSeleccionada)}>Editar</button><button className="danger-button" type="button" onClick={() => eliminarVenta(ventaSeleccionada.id)}>Eliminar</button></div></> : <p>Selecciona una venta para ver su detalle.</p>}
+              </div>
+            </div>
+          </section>
+        )}
+        {vista === 'venta-form' && <SaleForm form={ventaForm} setForm={setVentaForm} productos={productos} editing={ventaSeleccionada} onSubmit={guardarVenta} onCancel={() => setVista('ventas')} />}
+        {vista === 'inicio' && <>
         <section className="dashboard-preview" aria-label="Vista previa del dashboard">
           <img src={comidaImage} alt="Comida de Lucy Fast Food" />
           <div>
@@ -185,20 +366,56 @@ function App() {
           <div className="summary-grid">
             <article className="summary-card">
               <span>Ventas del día</span>
-              <strong>Bs. 0,00</strong>
+              <strong>{cargandoVentas ? '...' : formatoMoneda(totalVentas)}</strong>
             </article>
             <article className="summary-card">
               <span>Productos registrados</span>
-              <strong>0</strong>
+              <strong>{productos.length}</strong>
             </article>
             <article className="summary-card">
               <span>Pedidos registrados</span>
-              <strong>0</strong>
+              <strong>{cargandoVentas ? '...' : ventas.length}</strong>
             </article>
           </div>
+          {errorVentas && <p className="summary-error" role="alert">{errorVentas}</p>}
         </section>
+        </>}
       </main>
     </div>
+  )
+}
+
+function ProductForm({ form, setForm, editing, onSubmit, onCancel }) {
+  const actualizar = (campo, valor) => setForm((actual) => ({ ...actual, [campo]: valor }))
+
+  return (
+    <section className="form-section" aria-labelledby="product-form-title">
+      <p className="section-label">Productos</p>
+      <h2 id="product-form-title">{editing ? 'Editar producto' : 'Registrar producto'}</h2>
+      <form className="admin-form" onSubmit={onSubmit}>
+        <label>Nombre<input value={form.nombre} onChange={(event) => actualizar('nombre', event.target.value)} required /></label>
+        <label>Descripción<textarea value={form.descripcion} onChange={(event) => actualizar('descripcion', event.target.value)} /></label>
+        <div className="form-row"><label>Precio<input type="number" min="0.01" step="0.01" value={form.precio} onChange={(event) => actualizar('precio', event.target.value)} required /></label><label>Categoría<input value={form.categoria} onChange={(event) => actualizar('categoria', event.target.value)} required /></label></div>
+        <label>Imagen (URL)<input type="url" value={form.imagen} onChange={(event) => actualizar('imagen', event.target.value)} /></label>
+        <label className="check-label"><input type="checkbox" checked={form.disponible} onChange={(event) => actualizar('disponible', event.target.checked)} /> Disponible</label>
+        <div className="form-actions"><button type="submit">Guardar producto</button><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button></div>
+      </form>
+    </section>
+  )
+}
+
+function SaleForm({ form, setForm, productos, editing, onSubmit, onCancel }) {
+  return (
+    <section className="form-section" aria-labelledby="sale-form-title">
+      <p className="section-label">Ventas</p>
+      <h2 id="sale-form-title">{editing ? 'Editar venta' : 'Registrar venta'}</h2>
+      <form className="admin-form" onSubmit={onSubmit}>
+        <label>Producto<select value={form.productoId} onChange={(event) => setForm((actual) => ({ ...actual, productoId: event.target.value }))} required><option value="">Selecciona un producto</option>{productos.map((producto) => <option key={producto.id} value={producto.id}>{producto.nombre} - {formatoMoneda(producto.precio)}</option>)}</select></label>
+        <label>Cantidad<input type="number" min="1" step="1" value={form.cantidad} onChange={(event) => setForm((actual) => ({ ...actual, cantidad: event.target.value }))} required /></label>
+        <p className="form-note">El total se calcula automáticamente según el producto y la cantidad.</p>
+        <div className="form-actions"><button type="submit">Guardar venta</button><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button></div>
+      </form>
+    </section>
   )
 }
 
