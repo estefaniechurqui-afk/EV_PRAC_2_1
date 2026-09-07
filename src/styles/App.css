@@ -274,6 +274,10 @@ nav button.nav-active {
   object-fit: cover;
 }
 
+.public-product-image .default-product-image {
+  opacity: 0.9;
+}
+
 .public-product-content {
   padding: 18px;
 }

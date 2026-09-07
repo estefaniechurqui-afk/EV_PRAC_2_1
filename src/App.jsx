@@ -6,6 +6,7 @@ const API_URL = 'https://localhost:7244'
 const formatoMoneda = (valor) => `Bs. ${Number(valor).toLocaleString('es-BO', { minimumFractionDigits: 2 })}`
 const productoVacio = { nombre: '', descripcion: '', precio: '', categoria: '', imagen: '', disponible: true }
 const ventaVacia = { productoId: '', cantidad: 1 }
+const categoriaVacia = { nombre: '' }
 
 function App() {
   const [sesionIniciada, setSesionIniciada] = useState(Boolean(localStorage.getItem('token')))
@@ -16,6 +17,7 @@ function App() {
   const [cargando, setCargando] = useState(false)
   const [productos, setProductos] = useState([])
   const [cargandoProductos, setCargandoProductos] = useState(true)
+  const [categorias, setCategorias] = useState([])
   const [ventas, setVentas] = useState([])
   const [cargandoVentas, setCargandoVentas] = useState(false)
   const [errorVentas, setErrorVentas] = useState('')
@@ -25,6 +27,8 @@ function App() {
   const [productoForm, setProductoForm] = useState(productoVacio)
   const [ventaSeleccionada, setVentaSeleccionada] = useState(null)
   const [ventaForm, setVentaForm] = useState(ventaVacia)
+  const [categoriaSeleccionada, setCategoriaSeleccionada] = useState(null)
+  const [categoriaForm, setCategoriaForm] = useState(categoriaVacia)
   const [mensajeAdmin, setMensajeAdmin] = useState('')
   const [errorAdmin, setErrorAdmin] = useState('')
 
@@ -42,6 +46,20 @@ function App() {
     }
 
     cargarProductos()
+  }, [])
+
+  useEffect(() => {
+    const cargarCategorias = async () => {
+      try {
+        const response = await fetch(`${API_URL}/api/categorias`)
+        if (!response.ok) throw new Error('No se pudieron cargar las categorías')
+        setCategorias(await response.json())
+      } catch {
+        setCategorias([])
+      }
+    }
+
+    cargarCategorias()
   }, [])
 
   useEffect(() => {
@@ -118,6 +136,7 @@ function App() {
       descripcion: producto.descripcion || '',
       precio: producto.precio || '',
       categoria: producto.categoria || '',
+      categoriaId: producto.categoriaId || '',
       imagen: producto.imagen || '',
       disponible: producto.disponible ?? true,
     })
@@ -132,9 +151,14 @@ function App() {
     setMensajeAdmin('')
 
     try {
+      const productoPayload = {
+        ...productoForm,
+        precio: Number(productoForm.precio),
+        imagen: productoForm.imagen?.trim() || null,
+      }
       const response = await peticionProtegida(
         productoSeleccionado ? `/api/productos/${productoSeleccionado.id}` : '/api/productos',
-        { method: productoSeleccionado ? 'PUT' : 'POST', body: JSON.stringify({ ...productoForm, precio: Number(productoForm.precio) }) },
+        { method: productoSeleccionado ? 'PUT' : 'POST', body: JSON.stringify(productoPayload) },
       )
       if (!response.ok) throw new Error('No se pudo guardar el producto')
 
@@ -184,10 +208,17 @@ function App() {
       )
       if (!response.ok) throw new Error('No se pudo guardar la venta')
 
-      const ventaNueva = ventaSeleccionada ? { ...ventaSeleccionada, ...body } : await response.json()
+      const ventaNueva = ventaSeleccionada
+        ? await (async () => {
+          const detalleResponse = await peticionProtegida(`/api/ventas/${ventaSeleccionada.id}`)
+          if (!detalleResponse.ok) throw new Error('La venta se guardó, pero no se pudo actualizar el detalle')
+          return detalleResponse.json()
+        })()
+        : await response.json()
       setVentas((actuales) => ventaSeleccionada
         ? actuales.map((item) => item.id === ventaNueva.id ? ventaNueva : item)
         : [ventaNueva, ...actuales])
+      setVentaSeleccionada(ventaNueva)
       setVista('ventas')
       setMensajeAdmin('Venta guardada correctamente.')
     } catch (saveError) {
@@ -204,6 +235,52 @@ function App() {
       setMensajeAdmin('Venta eliminada correctamente.')
     } else {
       setErrorAdmin('No se pudo eliminar la venta.')
+    }
+  }
+
+  const prepararCategoria = (categoria = categoriaVacia) => {
+    setCategoriaSeleccionada(categoria.id ? categoria : null)
+    setCategoriaForm({ nombre: categoria.nombre || '' })
+    setVista('categoria-form')
+    setMensajeAdmin('')
+    setErrorAdmin('')
+  }
+
+  const guardarCategoria = async (event) => {
+    event.preventDefault()
+    setErrorAdmin('')
+    setMensajeAdmin('')
+
+    try {
+      const response = await peticionProtegida(
+        categoriaSeleccionada ? `/api/categorias/${categoriaSeleccionada.id}` : '/api/categorias',
+        { method: categoriaSeleccionada ? 'PUT' : 'POST', body: JSON.stringify(categoriaForm) },
+      )
+      if (!response.ok) throw new Error('No se pudo guardar la categoría')
+
+      const categoriaGuardada = categoriaSeleccionada
+        ? { ...categoriaSeleccionada, ...categoriaForm }
+        : await response.json()
+      setCategorias((actuales) => categoriaSeleccionada
+        ? actuales.map((item) => item.id === categoriaGuardada.id ? categoriaGuardada : item)
+        : [...actuales, categoriaGuardada])
+      setVista('categorias')
+      setCategoriaSeleccionada(categoriaGuardada)
+      setMensajeAdmin('Categoría guardada correctamente.')
+    } catch (saveError) {
+      setErrorAdmin(saveError.message)
+    }
+  }
+
+  const eliminarCategoria = async (id) => {
+    if (!window.confirm('¿Quieres eliminar esta categoría?')) return
+    const response = await peticionProtegida(`/api/categorias/${id}`, { method: 'DELETE' })
+    if (response.ok) {
+      setCategorias((actuales) => actuales.filter((categoria) => categoria.id !== id))
+      setCategoriaSeleccionada(null)
+      setMensajeAdmin('Categoría eliminada correctamente.')
+    } else {
+      setErrorAdmin('No se puede eliminar una categoría que tiene productos.')
     }
   }
 
@@ -251,7 +328,7 @@ function App() {
                     {producto.imagen ? (
                       <img src={producto.imagen} alt={producto.nombre} />
                     ) : (
-                      <span aria-hidden="true">🍔</span>
+                      <img className="default-product-image" src={comidaImage} alt="Imagen general de comida" />
                     )}
                   </div>
                   <div className="public-product-content">
@@ -312,6 +389,7 @@ function App() {
             <button className={vista.startsWith('venta') ? 'nav-active dropdown-trigger' : 'dropdown-trigger'} type="button" onClick={() => setMenuAbierto(menuAbierto === 'ventas' ? '' : 'ventas')} aria-expanded={menuAbierto === 'ventas'}>Ventas <span aria-hidden="true">⌄</span></button>
             {menuAbierto === 'ventas' && <div className="dropdown-menu"><button type="button" onClick={() => { setVista('ventas'); setMenuAbierto('') }}>Detalle</button><button type="button" onClick={() => { prepararVenta(); setMenuAbierto('') }}>Registrar</button></div>}
           </div>
+          <button className={vista.startsWith('categoria') ? 'nav-active' : ''} type="button" onClick={() => setVista('categorias')}>Categorías</button>
           <button className="logout-button" type="button" onClick={cerrarSesion}>Cerrar sesión</button>
         </nav>
       </header>
@@ -331,7 +409,7 @@ function App() {
             </div>
           </section>
         )}
-        {vista === 'producto-form' && <ProductForm form={productoForm} setForm={setProductoForm} editing={productoSeleccionado} onSubmit={guardarProducto} onCancel={() => setVista('productos')} />}
+        {vista === 'producto-form' && <ProductForm form={productoForm} setForm={setProductoForm} categorias={categorias} editing={productoSeleccionado} onSubmit={guardarProducto} onCancel={() => setVista('productos')} />}
         {vista === 'ventas' && (
           <section className="management-section" aria-labelledby="sales-title">
             <div className="section-heading"><div><p className="section-label">Administración</p><h2 id="sales-title">Ventas</h2></div><button className="primary-admin-button" type="button" onClick={() => prepararVenta()}>Nueva venta</button></div>
@@ -346,6 +424,20 @@ function App() {
           </section>
         )}
         {vista === 'venta-form' && <SaleForm form={ventaForm} setForm={setVentaForm} productos={productos} editing={ventaSeleccionada} onSubmit={guardarVenta} onCancel={() => setVista('ventas')} />}
+        {vista === 'categorias' && (
+          <section className="management-section" aria-labelledby="categories-title">
+            <div className="section-heading"><div><p className="section-label">Administración</p><h2 id="categories-title">Categorías</h2></div><button className="primary-admin-button" type="button" onClick={() => prepararCategoria()}>Nueva categoría</button></div>
+            <div className="management-grid">
+              <div className="record-list">
+                {categorias.map((categoria) => <button className={categoriaSeleccionada?.id === categoria.id ? 'record-item selected' : 'record-item'} type="button" key={categoria.id} onClick={() => setCategoriaSeleccionada(categoria)}><span>{categoria.nombre}</span></button>)}
+              </div>
+              <div className="record-detail">
+                {categoriaSeleccionada ? <><p className="section-label">Detalle de la categoría</p><h3>{categoriaSeleccionada.nombre}</h3><p>Los productos de esta categoría se muestran en el catálogo.</p><div className="detail-actions"><button type="button" onClick={() => prepararCategoria(categoriaSeleccionada)}>Editar</button><button className="danger-button" type="button" onClick={() => eliminarCategoria(categoriaSeleccionada.id)}>Eliminar</button></div></> : <p>Selecciona una categoría para ver su detalle.</p>}
+              </div>
+            </div>
+          </section>
+        )}
+        {vista === 'categoria-form' && <CategoryForm form={categoriaForm} setForm={setCategoriaForm} editing={categoriaSeleccionada} onSubmit={guardarCategoria} onCancel={() => setVista('categorias')} />}
         {vista === 'inicio' && <>
         <section className="dashboard-preview" aria-label="Vista previa del dashboard">
           <img src={comidaImage} alt="Comida de Lucy Fast Food" />
@@ -385,7 +477,7 @@ function App() {
   )
 }
 
-function ProductForm({ form, setForm, editing, onSubmit, onCancel }) {
+function ProductForm({ form, setForm, categorias, editing, onSubmit, onCancel }) {
   const actualizar = (campo, valor) => setForm((actual) => ({ ...actual, [campo]: valor }))
 
   return (
@@ -395,7 +487,7 @@ function ProductForm({ form, setForm, editing, onSubmit, onCancel }) {
       <form className="admin-form" onSubmit={onSubmit}>
         <label>Nombre<input value={form.nombre} onChange={(event) => actualizar('nombre', event.target.value)} required /></label>
         <label>Descripción<textarea value={form.descripcion} onChange={(event) => actualizar('descripcion', event.target.value)} /></label>
-        <div className="form-row"><label>Precio<input type="number" min="0.01" step="0.01" value={form.precio} onChange={(event) => actualizar('precio', event.target.value)} required /></label><label>Categoría<input value={form.categoria} onChange={(event) => actualizar('categoria', event.target.value)} required /></label></div>
+        <div className="form-row"><label>Precio<input type="number" min="0.01" step="0.01" value={form.precio} onChange={(event) => actualizar('precio', event.target.value)} required /></label><label>Categoría<select value={form.categoriaId || ''} onChange={(event) => { const categoria = categorias.find((item) => item.id === Number(event.target.value)); setForm((actual) => ({ ...actual, categoriaId: categoria?.id || null, categoria: categoria?.nombre || '' })) }} required><option value="">Selecciona una categoría</option>{categorias.map((categoria) => <option key={categoria.id} value={categoria.id}>{categoria.nombre}</option>)}</select></label></div>
         <label>Imagen (URL)<input type="url" value={form.imagen} onChange={(event) => actualizar('imagen', event.target.value)} /></label>
         <label className="check-label"><input type="checkbox" checked={form.disponible} onChange={(event) => actualizar('disponible', event.target.checked)} /> Disponible</label>
         <div className="form-actions"><button type="submit">Guardar producto</button><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button></div>
@@ -410,10 +502,23 @@ function SaleForm({ form, setForm, productos, editing, onSubmit, onCancel }) {
       <p className="section-label">Ventas</p>
       <h2 id="sale-form-title">{editing ? 'Editar venta' : 'Registrar venta'}</h2>
       <form className="admin-form" onSubmit={onSubmit}>
-        <label>Producto<select value={form.productoId} onChange={(event) => setForm((actual) => ({ ...actual, productoId: event.target.value }))} required><option value="">Selecciona un producto</option>{productos.map((producto) => <option key={producto.id} value={producto.id}>{producto.nombre} - {formatoMoneda(producto.precio)}</option>)}</select></label>
+        <label>Producto<select value={form.productoId} onChange={(event) => setForm((actual) => ({ ...actual, productoId: event.target.value }))} required><option value="">Selecciona un producto</option>{productos.filter((producto) => producto.disponible).map((producto) => <option key={producto.id} value={producto.id}>{producto.nombre} - {formatoMoneda(producto.precio)}</option>)}</select></label>
         <label>Cantidad<input type="number" min="1" step="1" value={form.cantidad} onChange={(event) => setForm((actual) => ({ ...actual, cantidad: event.target.value }))} required /></label>
         <p className="form-note">El total se calcula automáticamente según el producto y la cantidad.</p>
         <div className="form-actions"><button type="submit">Guardar venta</button><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button></div>
+      </form>
+    </section>
+  )
+}
+
+function CategoryForm({ form, setForm, editing, onSubmit, onCancel }) {
+  return (
+    <section className="form-section" aria-labelledby="category-form-title">
+      <p className="section-label">Categorías</p>
+      <h2 id="category-form-title">{editing ? 'Editar categoría' : 'Registrar categoría'}</h2>
+      <form className="admin-form" onSubmit={onSubmit}>
+        <label>Nombre<input value={form.nombre} onChange={(event) => setForm({ nombre: event.target.value })} required maxLength="80" /></label>
+        <div className="form-actions"><button type="submit">Guardar categoría</button><button type="button" className="secondary-button" onClick={onCancel}>Cancelar</button></div>
       </form>
     </section>
   )
